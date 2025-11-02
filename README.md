@@ -113,343 +113,219 @@
 
 ## 트러블 슈팅
 
-### ESLint 네이밍 컨벤션 설정 수정
+### 관심 스토어 조회 에러 수정
 
 #### 구현 방식
+1. db 관심 스토어 테이블에서 관심 스토어 조회 
 
-1. 프로젝트 초기에 eslint/naming-convention 규칙을 세부적으로 설정하여 변수, 함수, 클래스, 인터페이스, enum, 타입, 객체 리터럴 키 등 네이밍 규칙을 강제.
-
-2. 특히 인터페이스에는 I prefix, enum에는 Enum suffix, 타입 파라미터에는 T prefix를 사용하도록 설정.
-
-#### 문제점
-1. 규칙이 지나치게 엄격해 개발 속도를 저하시킴. (이곳저곳에서 오류남, 명세서 요구사항이랑 충돌함)
-
-2. prefix, suffix 강제 규칙이 전역 타입 선언 시나 enum 사용 시 이름을 길게 만들어서 작성이 번거로웠음.
-
-3. prefix, suffix 가 없어도 각자 역할이 뭔지 쉽게 알 수 있었음.
-
-#### 해결 방법
-1. 인터페이스, enum, 타입 파라미터에 대한 prefix/suffix 규칙 제거.
-
-2. PascalCase 또는 camelCase 형식만 강제하여 가독성과 일관성은 유지하되, 불필요한 네이밍 강제는 완화.
-
-3. 명세서와 충돌하는 사항은 프론트엔드 코드를 수정
-
-<br>
-
-### 첨부파일 단일 업로드 제한
-
-#### 구현 방식
-1.  multer의 upload.single('file') 메서드를 사용하여 단일 파일만 업로드 가능.
-
-2. 업로드된 파일은 req.file 객체로 받아 Firebase Storage에 저장하고, 서명 URL(Signed URL)을 생성하여 응답으로 전달.
-
-3. 파일명은 원본 파일명 + 업로드 시각(timestamp) + UUID 조합으로 생성해 중복 방지.
+2. 관심 등록된 스토어가 없거나 스토어의 length 가 0 일경우 에러를 던짐.
 
 #### 문제점
-1. 프론트엔드에서는 여러 파일을 동시에 업로드할 수 있도록 UI가 구현되어 있었으나, 백엔드에서 단일 파일만 허용.
-  
-2. 요청 필드명(file)이 프론트 요구사항(files)과 불일치.
+1. 관심 스토어가 없어서 에러를 던질 경우, 웹 페이지에서 관심 스토어 목록을 로드할 수 없는 에러 발생
 
 #### 해결 방법
-1. Multer 설정을 upload.array('files')로 변경해 다중 업로드 허용.
+1. 스토어가 없거나 length가 0 일경우 에러를 던지지 않고 빈 배열을 리턴하여 관심스토어가 없더라도 로드 될 수 있게 변경
 
-2. 컨트롤러에서 req.files를 배열로 받아 Promise.all을 사용해 병렬 업로드 처리.
+```ts
+ const likedStores = await this.userRepository.getUserLikedStores(userId);
 
-3. 파일명 생성, Firebase 업로드, URL 생성 과정을 배열 순회하며 처리.
-
-4. 응답 형식을 { data: uploadedUrls } 형태로 변경해 여러 파일 URL 반환.
-
-```js
-router.post('/', upload.array('files'), uploadFiles);
-
-const files = req.files as Express.Multer.File[];
-if (!files) throw { status: statusCode.badRequest, message: errorMsg.wrongRequestFormat };
-
-const uploadedUrls = await Promise.all(
-  files.map(async (file) => {
-    const { originalname, buffer, mimetype } = file;
-    const ext = path.extname(originalname);
-    const baseName = path.basename(originalname, ext);
-    const safeBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const timestamp = Date.now();
-    const firebaseFileName = `${safeBaseName}_${timestamp}_${randomUUID()}${ext}`;
-    const destination = `files/${firebaseFileName}`;
-
-    const fileRef = bucket.file(destination);
-    await fileRef.save(buffer, { metadata: { contentType: mimetype } });
-
-    const [url] = await fileRef.getSignedUrl({ action: 'read', expires: '03-01-2500' });
-    return url;
-  })
-);
-
-return res.status(200).json({ data: uploadedUrls });
-```
-
-<br>
-
-### orderBy 네이밍 컨벤션 오류
-
-#### 구현 방식
-1. 프론트엔드에서 할 일 목록을 정렬할 때, orderBy 쿼리 파라미터를 전송.
-
-2. 백엔드에서 해당 값을 taskRepository.getAllTasks()의 orderBy 옵션으로 전달.
-
-3. Prisma ORM이 DB 컬럼명을 기반으로 정렬을 수행 (createdAt, dueDate 등).
-
-#### 문제점
-1. 프론트엔드에서 endDate라는 키를 보내지만, DB 컬럼명은 dueDate.
-
-2. Prisma가 인식하지 못하는 필드를 전달하면 쿼리 에러 발생.
-
-3. 컬럼명이 불일치해 정렬 기능이 동작하지 않음.
-
-#### 해결 방법
-
-1. 백엔드에서 프론트 orderBy 값을 내부 컬럼명으로 변환하는 매핑 함수 추가.
-
-2. endDate가 들어오면 dueDate로 변경, 나머지는 그대로 전달.
-
-```js
-// 매핑 함수 추가
-const mapOrderByKey = (key: string) => (key === 'endDate' ? 'dueDate' : key);
-
-const result = await taskRepository.getAllTasks({
-  projectId,
-  userId,
-  status,
-  assignee,
-  keyword,
-  order,
-  orderBy: mapOrderByKey(orderBy) as TaskOrderBy, // 매핑 적용
-  skip,
-  take: limit,
-});
-```
-- 스키마를 변경하는 방법도 있지만 매핑으로 해결해보고 싶었습니다.
-
-```js
-// status 를 isDone 으로 변환
-    if ('status' in data) {
-      data.isDone = data.status === 'done';
-      delete data.status;
+    if (!likedStores || likedStores.length === 0) {
+      return [];
     }
-```
-- 같은 방법으로 하위 할일의 체크박스 기능 오류를 수정했습니다.
 
-<br>
-
-### 할 일 상세 페이지에서 이미지 첨부 불가
-
-#### 구현 방식
-1. 할 일 업데이트 API는 날짜·상태·담당자·태그·첨부파일까지 한 요청에서 함께 수정하도록 설계.
-
-2. 날짜는 startYear/Month/Day, endYear/Month/Day 를 받아 startedAt, dueDate 로 변환하여 저장.
-
-3. 첨부파일은 프론트에서 넘어온 URL 배열을 받아 DB(taskFiles)에 매핑 후 응답으로 반환.
-
-#### 문제점
- 1. 첨부파일만 업데이트하는 경우 날짜 미전달로 에러
-    - 프론트는 첨부파일만 수정할 때 날짜 필드를 보내지 않음 > new Date(undefined, …)가 되어 변환 에러.
-      
- 3. 응답 스키마 불일치(배열 형태 차이)
-    - 프론트는 attachments: string[](URL 배열)을 기대했지만,
-    - 백엔드는 { id, url }[] 형태로 반환
-   
-#### 해결 방법
-1. 날짜 옵셔널 처리 (값이 있을때만 업데이트)
-
-```js
-const startedAt =
-  startYear && startMonth && startDay
-    ? new Date(startYear, startMonth - 1, startDay)
-    : undefined;
-
-const dueDate =
-  endYear && endMonth && endDay
-    ? new Date(endYear, endMonth - 1, endDay)
-    : undefined;
-```
-
-2. 응답 방식 통일
-
-```js
-return {
-attachments: task.taskFiles.map((file) => file.fileUrl), // ← string[]
-}
-```
-
-#### 개선점
-옵셔널은 현재의 오류만 해결해줄 뿐, 좋은 대안은 아닌 것 같다는 생각이 들어 작성합니다.
-1. 프론트에서 항상 날짜를 보내도록 강제하는 방법
-   
-2. 값이 없다면, db에서 기존 날짜값을 읽어와 유지하는 방법
-
-<br>
-
-### 이미지 삭제 버튼 표시 안 됨
-
-#### 문제점
-1. flex-grow: 1 만 적용된 상태에서 긴 파일명일 경우, 파일명 영역이 버튼 영역을 침범해 버튼이 사라진 것처럼 보이는 현상 발생.
-
-#### 해결 방법
-
-1. .fileName의 flex-grow: 1을 **flex: 1;**로 변경.
-
-2. flex: 1;은 flex-grow: 1; flex-shrink: 1; flex-basis: 0; 세 속성을 한 번에 지정하는 축약형.
-
-3. 이를 통해 .fileName은 공간을 균등하게 차지하면서도, 삭제 버튼이 항상 표시될 수 있도록 공간이 보장됨.
-
-```js
-.fileName {
-  flex: 1; // flex-grow:1; flex-shrink:1; flex-basis:0; 
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-}
-```
-
-<br>
-
-### 상태 수정 시 태그·첨부파일이 삭제되던 문제
-
-#### 구현 방식
-1. 기존 업데이트 로직에서 taskTags와 taskFiles는 항상 deleteMany → create 패턴으로 처리.
-
-2. 요청에 태그나 첨부파일이 없으면 deleteMany로 모두 삭제된 뒤 새 값이 없으니 빈 상태로 저장됨.
-
-3. 기본값을 []로 설정하여 attachments = [], tags = []가 요청 시 자동 들어오도록 함.
-
-#### 문제점
-1. 다른 필드 (상태, 내용) 만 수정해도 기본값 [] 때문에 기존 태그·첨부파일이 전부 삭제됨.
-
-2. 사용자는 단순 상태 변경만 했는데, 기존 첨부파일과 태그가 전부 사라지는 손실 발생.
-
-#### 해결 방법
-1. tags나 attachments가 undefined일 때는 수정 로직을 스킵하게 변경.
-
-2. 기본값 [] 제거 → 요청에서 값이 빠지면 undefined로 인식.
-
-```js
-// repository
-taskTags: tags !== undefined
-  ? {
-      deleteMany: {},
-      create: tags.map((tagName) => ({
-        tag: {
-          connectOrCreate: {
-            where: { tag: tagName },
-            create: { tag: tagName },
-          },
-        },
-      })),
-    }
-  : undefined,
-
-taskFiles: attachments !== undefined
-  ? {
-      deleteMany: {},
-      create: attachments.map((file) => ({
-        fileName: file.name,
-        fileUrl: file.url,
-      })),
-    }
-  : undefined,
-
-```
-
-<br>
-
-### description 필드 없음
-
-#### 문제점
-1. API 명세서에는 description 필드가 없었으나, 프론트엔드 예시에서는 할일 상세 페이지에 내용을 표시하고 있었음.
-
-#### 해결 방법
-
-1. description 필드 추가
+ ```
  
-2. 각 기능 응답 객체에 description 필드를 포함시켜 프론트 표시 요구사항 충족.
+<br>
 
-<br><br>
+### 유저 아이콘 더미 이미지 오류
+
+#### 구현 방식
+1. 회원 가입시, User 테이블의 image 필드의 default 값으로 아무 기능이 없는 단순 문자열을 작성 ("https://example.com/default.png")
+
+#### 문제점
+1. 로그인 후 브라우저 유저 아이콘 로드 오류
+
+#### 해결 방법
+1. [placehold](https://placehold.co) 사이트를 이용하여 User 텍스트가 쓰여진 더미 이미지로 default 값을 교체
+
+2. 브라우저에서 로드 완료
+
+```ts
+  image String?  @default("https://placehold.co/400.jpg?text=user")
+```
+
+<br>
+
+### 자동 배포 실행중 npm ci 무한 로딩 오류
+
+#### 구현 방식
+1. GitHub Actions VM 으로 소스 코드 복사 후 npm ci 및 npm run build 명령을 실행하여 빌드 수행
+
+2. 빌드된 결과물과 전체 소스 코드를 EC2 서버로 복사
+
+3. 내부에서 .env 생성 등 주요 파일 생성 후  npm ci 실행
+
+#### 문제점
+1. ci 실행중 메모리 부족으로 무한 로드 현상 발생
+
+2. 그로 인해서 이후 cd 스크립트가 동작하지 않음 
+
+#### 해결 방법
+
+1. npm ci --ignore-scripts 스크립트를 이용하여 메모리를 사용량이 높다고 추측되는 postinstall 스크립트를 건너뜀
+
+2. 설치가 끝난 이후 메모리 공간이 확보 되면 필요한 설치 스크립트를 추가 실행.
+
+
+<br>
+
+### .env prod/dev 환경 분리 트러블
+
+#### 구현 방식
+1. 쿠키 옵션을 환경별로 다루기 위해 .env prod/dev 분리를 시도
+
+2. .env 를 .env.prod, .env.dev 로 나눔
+
+#### 문제점
+ 1. .env.dev와 .env.prod로 분리했지만, Prisma를 비롯한 여러 도구에 별도의 환경 파일을 지정해야 하는 번거로움이 생김
+
+ 2. 반면, 애초에 분리의 목적이 단순히 쿠키 옵션 하나를 구분하는 것이었기 때문에, 전체 복잡도에 비해 효용이 크지 않음
+ 
+#### 해결 방법
+1. 프로젝트의 크지않은 규모와 좋지 못 했던 효율을 고려하여 다시 .env 의 형태로 통합
+
+2. 쿠키 옵션은 NODE_ENV 로 자동으로 분기되게 처리
+
+```ts
+export const IS_PROD = process.env.NODE_ENV === 'production';
+export const COOKIE_SECURE = IS_PROD ? true : false;
+export const COOKIE_SAMESITE = IS_PROD ? 'none' : 'lax';
+```
+
+2. 배포시엔 .env.prod 가 아니라 Actions secrets 에 등록되어있는 Repository secrets를 참조하여 
+   .env를 새로 작성하도록 변경
+
+<br>
+
+### Nginx 와 Pm2 설정 파일 트러블
+
+#### 구현 방식
+1. ec2 내부에서 nginx 와 pm2 설정 파일을 작성
+
+#### 문제점
+1. nginx 설정을 바꾸고 싶을 경우 인스턴스에 재접속해 내부에서 수정해야하는 번거로움
+
+2. pm2 설정파일을 ec2 내부에서 직접 작성 할 경우 , 추후 로컬 cd 코드로 배포시 로컬과 배포서버 내부 코드의 충돌 여부
+
+#### 해결 방법
+
+1. 로컬 소스코드 디렉토리에서 nginx 설정과 pm2 설정 파일을 작성 
+
+2. nginx 파일은 cd 과정에서 CI/CD 도구가 소스코드를 ec2 내부에 복사 후  
+   로컬 저장소에 포함된 nginx 설정 파일을 실제 nginx 설정 경로로 이동
+   
+   ```bash
+   sudo cp ./nginx/nginx.conf /etc/nginx/conf.d/codi-it-proxy.conf
+   ```
+
+3. pm2 파일은 cd 과정에서 로컬 환경에서 작성된 설정 파일(ecosystem.config.js) 을  
+   CI/CD 도구를 통해 ec2 서버에 복사하고 적용
+
+<br>
 
 ## 협업 및 피드백
 
-1. 개발 규칙을 팀 위키에 정리해 두어, 모든 팀원이 참고하기 편했고 규칙의 일관성을 유지할 수 있었습니다.
+1. 개발 규칙을 팀 위키 및 팀 프로젝트 문서에 정의해 두어, 모든 팀원이 참고하기 편했고 규칙의 일관성을 유지할 수 있었습니다.
 
-2. ESLint, Prettier, Husky, lint-staged 사용을 제안하고 적용했습니다.
+2. PR 작성 시 리뷰어를 지정하고, 리뷰를 받은 뒤 본인이 직접 머지하는 방식으로 진행했습니다.
    
-   초기에는 설정이 과도하여 개발 속도에 영향을 주었으나, 일부 규칙을 완화하여 실용성을 높였습니다.
+   디스코드 깃훅 연동 코드를 직접 작성하여 PR, Approve, Merge 시 디스코드로 연동 알림이 가도록 적용 하였습니다.
 
-3. PR 작성 시 리뷰어를 지정하고, 리뷰를 받은 뒤 본인이 직접 머지하는 방식으로 진행했습니다.
-   
-   리뷰 과정에서 적극적으로 소통하며 문제점을 빠르게 보완할 수 있었습니다.
+3. 이슈 작성을 통해 작업중인 내용의 세부사항을 파악하기 편리 했고,  
+   PR 작성시 관련 이슈들을 참조하여 PR의 내용이 좀더 간결해지고 깔끔해질 수 있었습니다.
 
-4. 테스트를 진행한 후 수정이 필요한 부분을 프로젝트 계획서 하단에 팀원들이 기록해주어서, 트러블슈팅 과정이 훨씬 수월했습니다.
+4. 노션 프로젝트 계획서의 테이블 뷰 표를 이용해 프로젝트 진행도와 팀원들의 작업 내용, 기간, 상태를 명확하게 파악할 수 있었습니다.   
 
 <br><br>
 
 ## 코드 품질 및 최적화
 
-#### ESLint, Prettier, Husky, lint-staged 적용
+#### ESLint, Prettier 적용
 
-1.코드 일관성과 품질 유지를 위해 ESLint와 Prettier를 도입하여 정적 분석 및 자동 코드 포매팅을 적용하였습니다.
+1. ESLint와 Prettier 라이브러리를 도입하여 팀의 코딩 스타일을 통일시켰습니다.  
 
-2. Husky와 lint-staged를 통해 커밋 전 자동으로 린트 및 포맷 검사를 수행함으로써
-   불필요한 코드 스타일 차이와 기본적인 오류를 사전에 방지하였습니다.
+2. ESLint 검사를 CI 파이프라인에 포함시켜 코드 품질을 자동으로 점검할 수 있도록 구성했습니다.
 
-#### Layered Architecture 적용
+#### Class-validator 적용
+1. Class-validator 라이브러리를 활용하여 런타임에서 입력 데이터의 유효성을 자동으로 검증하도록 구성했습니다.
 
-1. 유지보수성과 확장성을 높이기 위해 Layered Architecture를 적용하였습니다.
-   
-   이를 통해 API 인터페이스, 비즈니스 로직, db접근 로직을 명확히 분리하여 모듈화된 개발 환경을 구현했습니다.
+2. DTO 단에서 필수 값, 문자열 길이, 숫자 범위 등 데이터 규칙을 명확히 정의함으로써, 런타임 오류 발생 가능성을 최소화했습니다.
 
-#### Node/NPM 버전 통일
+#### Jest, Supertest 기반 테스트 자동화
 
-1. 멘토님의 조언에 따라 협업 시 버전 차이로 인한 환경 불일치와 충돌을 예방하기 위해 Node.js와 npm 버전을 통일하였습니다.
+1. Jest를 활용하여 서비스 및 레포지토리 파일의 유닛 테스트를 구현했습니다.
 
-    - Node.js: 22.17.1
-    - npm: 10.9.2
-      
-<br><br>
+2. Supertest를 함께 사용하여 API 엔드포인트 통합 테스트를 자동화함으로써, 실제 요청/응답 흐름의 안정성을 검증했습니다.
+
+3. 테스트는 CI 과정에도 포함되어 있어, 코드 변경 시마다 자동 테스트 수행되도록 구성했습니다.
+
+#### Feature-based Architecture 적용
+
+1. 프로젝트 구조를 기능 단위로 설계하여,  
+   각 기능(user, product, dashboard 등)이 독립적인 모듈로 동작하도록 구성했습니다.
+
+2. 전통적인 레이어드 아키텍쳐에 비해 기능별 책임이 명확하고, 코드 탐색 및 유지보수가 용이하며,  
+   새로운 기능 추가 시 다른 모듈에 영향을 주지 않는 장점이 있습니다.
+
+3. 각 기능 폴더 내부에는 controller, service, repository, dto, router 등이 함께 포함되어  
+   하나의 기능이 독립적으로 구분된 구조를 유지합니다.
+
+<br>
 
 ## 향후 개선 사항
 
-1. Prisma 자동 생성 타입 활용
+1. NestJS 프레임워크 도입
 
-   현재는 직접 정의한 타입을 사용했으나, Prisma가 제공하는 자동 생성 타입을 활용하면 더 깔끔한 코드 작성이 가능할 것 같습니다.
+   Express 를 사용하면서 코드 가독성과 재사용성 그리고 자동 문서작업  
+   그리고 나중에 추가된 TypeScript와의 낮은 호환성에서 어려움을 겪었습니다.  
+   현재는 Express 기반으로 서버를 구성했지만, 향후 프로젝트에서는 nest.js 를 사용해볼 예정입니다.  
+   
+2. 상세 로깅 시스템 강화
 
-2. 초기 설계 및 명세 파악 강화
+   현재의 로깅은 단순한 콘솔 출력 중심으로 구성되어 있습니다.  
+   향후에는 Winston 같은 전문 로깅 라이브러리를 도입하여,  
+   오류 발생 시 어느 기능에서 어떤 상황으로 오류가 발생했는지를 상세히 기록할 수 있도록 개선할 계획입니다.  
+   이를 통해서 오류 원인 추적 속도를 높이고, 문제에 대한 대응 효율성을 향상시킬 예정입니다.
 
-   코드 작성 후 테스트·수정 과정에서 코드가 점점 복잡해졌습니다.
+3. Docker 기반 환경 구성
 
-   프로젝트 초기에 API 명세서와 프론트엔드 예시를 충분히 분석하여 설계 단계에서 구조를 깔끔히 잡는 것이 중요하다고 느꼈습니다.
+   프로젝트 개발 과정에서는 docker를 깊이 있게 적용하지 못했습니다.  
+   그러나 docker의 환경 일관성 보장 및 배포 자동화 효율성을 직접 체감하며 그 필요성을 인식했습니다.  
+   추후에는 docker를 활용하여 로컬 개발 환경과 배포 환경 간의 설정 차이 문제를 최소화하고,  
+   docker-compose를 이용해 데이터베이스, 서버, Nginx 등 전체 서비스를 컨테이너 단위로 관리할 예정입니다.
 
-3. 클래스 기반 구조 적용
+4. 마이그레이션 파일 관리 체계화
 
-   현재는 Express 미들웨어 함수와 객체 리터럴 방식만 사용했습니다.
+   현재는 마이그레이션 파일 충돌을 방지하기 위해 .gitignore로 관리에서 제외하였습니다.  
+   하지만 추후에는 마이그레이션을 한 명 또는 전담 프로세스에서 관리하여, 충돌을 방지할 계획입니다.
 
-   향후에는 클래스 기반 서비스·컨트롤러 구조를 적용해 확장성과 보안, 재사용성을 높이고 싶습니다.
+5. 테스트 코드 품질 개선
 
-4. 중복 인증 로직의 미들웨어화
+   현재 제가 작성한 테스트 코드는 기본적인 상태 코드 및 응답 값 검증 수준에 머물러 있습니다.  
+   향후에는 테스트 커버리지 확대와 Mocking 기반의 테스트 코드 강화를 통해  
+   비즈니스 로직과 API의 동작을 더 면밀히 검증할 계획입니다.
 
-   인증 관련 검증 로직이 여러 곳에 중복되어 있습니다.
+6. CI/CD 파이프라인 고도화
 
-   이를 공통 미들웨어로 분리하면 코드 중복을 줄이고 가독성을 개선할 수 있겠다는 생각을 했습니다.
+   현재 작성된 CI/CD 스크립트는 기본적인 테스트, 빌드 및 배포 기능만을 수행하고 있습니다.  
+   향후에는 에러 핸들링, 헬스체크, 롤백 자동화 등을 추가하여 배포 과정의 안정성과 복원력을 강화할 계획입니다.
 
-5. 페이지네이션 심화 학습
+7. AWS 및 인프라 지식 고도화
 
-   페이지네이션 로직에 대한 이해가 부족하다고 느꼈습니다.
-
-   다양한 페이지네이션 방식(오프셋·커서 기반 등)과 깔끔한 작성 방법, 성능 최적화 기법에 대해 추가 학습이 필요합니다.
-
-6. 트랜잭션 관리 적용
-
-   다음 파트에선 데이터 무결성과 일관성을 보장하기 위해, 여러 쿼리를 묶어 처리하는 트랜잭션 로직을 적용해볼 생각입니다.
-
-   DB 연산이 동시에 이뤄지는 기능에서는 트랜잭션을 적용하면 안정성을 높일 수 있을 것 같다는 생각이 들었습니다.
-
+   현재 AWS 배포 과정에서 VPC, Security Group, IAM 권한 구조 등에 대한 이해가 충분하지 않습니다.  
+   향후에는 해당 영역을 심화 학습하여  보안 설정, 네트워크 구조 설계, Auto Scaling 구성 등  
+   운영 환경 전반에 대한 이해도를 높일 계획입니다.
+   
 <br>
 
 ## 협업 및 관리 문서
