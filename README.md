@@ -1,18 +1,20 @@
-# 중급 프로젝트 개인 개발 리포트 
+# 고급 프로젝트 개인 개발 리포트 
 
-**작성자**: 2팀 하상준  
+**작성자**: 1팀 하상준
 
-**프로젝트명**: Moonshot  
+**프로젝트명**: Codi-it 
 
-**배포주소**: [https://nb-02-moon-shot-fe.vercel.app/login](https://nb-02-moon-shot-fe.vercel.app/login)
+**프로젝트 레포**: [https://github.com/Codi-It-backend](https://github.com/nb02-codi-it-team1/Codi-It-backend)
 
-**저장소** : [nb02-moonshot-team2](https://github.com/nb02-moonshot-team2/nb02-moonshot-backend)
+<br>
 
-**Swagger**: [https://nb02-moonshot.onrender.com/api-docs/](https://nb02-moonshot.onrender.com/api-docs/)
+## 배포 링크
 
-**팀 위키** : [개발 규칙](https://github.com/nb02-moonshot-team2/nb02-moonshot-backend/wiki)
+**백엔드**: [https://codi-it-backend.site](https://codi-it-backend.site/health)
 
+**프론트엔드**: [https://codi-it-frontend.vercel.app](https://codi-it-frontend.vercel.app/products)
 
+**Swagger**: [https://codi-it-backend.site/api-docs](https://codi-it-backend.site/api-docs/)
 
 <br>
 
@@ -20,64 +22,94 @@
 
 <br>
 
-Moonshot은 사용자가 참여하는 프로젝트의 일정과 할 일을 체계적으로 관리할 수 있는 웹 서비스입니다.
+**CODI-IT**은 패션 이커머스 환경에서 판매자와 구매자를 연결하는 **고급 패션 커머스 플랫폼**입니다.
 
-프로젝트 생성, 멤버 초대, 할 일 등록·수정·삭제, 댓글 작성 등 협업에 필요한 기능을 제공하며, 칸반 보드와 캘린더 뷰를 통해 진행 상황을 직관적으로 파악할 수 있습니다.
+상품 등록부터 주문·결제·리뷰·알림·통계까지의 전 과정을 통합 관리할 수 있도록 설계되어,  
+판매자에게는 효율적인 매출 관리 환경을, 구매자에게는 직관적이고 즐거운 쇼핑 경험을 제공합니다.
 
-또한, 정렬·필터·검색 기능을 통해 원하는 작업을 빠르게 찾을 수 있으며,
+**진행 기간**: 2025.09.15 ~ 2025.11.03
 
-프로젝트 삭제나 유저 탈퇴 시 관련 데이터를 안전하게 처리하는 데이터 무결성 기능을 갖추고 있습니다.
-
-
-
-<br><br>
-
-## 담당 작업
+**ERD 구조**: [https://github.com/nb02-codi-it-team1/Codi-It-backend/wiki/ERD](https://github.com/nb02-codi-it-team1/Codi-It-backend/wiki/ERD-%EA%B5%AC%EC%A1%B0)
 
 <br>
 
-#### 할 일 및 태그 기능 구현 
+### 기술 스택
 
-1. 프로젝트 내 할 일을 등록, 수정, 삭제할 수 있도록 구현하였으며, 할 일별로 다중 태그를 지정할 수 있도록 설계하였습니다.
-
-2. 할 일 목록은 담당자별, 상태별, 이름순, 기한임박순의 정렬 및 필터 기능을 지원하도록 구현했습니다.
-
-#### 파일 업로드 기능 구현
- 
-1. 할 일에 첨부파일을 업로드할 수 있도록 기능을 구현하였으며, 업로드된 파일은 파이어베이스 스토리지에 보관되도록 처리했습니다.
-
-#### 시연 영상 촬영
-
-1. 중급 프로젝트 제출 자료중 시연 영상 부분을 담당했습니다.
-
-<br><br>
-
-## 기술적 성과
-
-### 사용한 기술 스택
-
-| 구분          | 기술명                                  |
-| ----------- | ------------------------------------ |
-| 런타임/프레임워크   | **Node.js**, **Express**             |
-| 데이터         | **PostgreSQL**, **Prisma ORM**       |
-| 인증/보안       | **bcrypt**, **JWT(또는 쿠키)**, **cors** |
-| 파일          | **multer**, **firebase**             |
-| 개발 환경/코드 품질 | **ESLint**, **Prettier**, **Husky**, **lint-staged** |
-
+|     분류     | 사용 도구                          |
+| :----------: | ---------------------------------- |
+|  프레임워크  | Node.js (Express)                  |
+|     언어     | TypeScript                         |
+|  스키마/ORM  | Prisma                             |
+| 데이터베이스 | PostgreSQL                         |
+|  API 문서화  | swagger                            |
+| 실시간 알림  | SSE(Server-Sent Events)            |
+|    테스트    | Jest + supertest                   |
+|  코드 품질   | ESLint + Prettier, class-validator |
+|    CI/CD     | Github Actions                     |
+|     배포     | AWS EC2, S3, Nginx, PM2, RDS       |
+|  협업 도구   | Discord, GitHub, Notion            |
+|  일정 관리   | GitHub Issues + Notion             |
 
 <br>
 
 ### 주요 구현 기능
 
-1. 할 일 등록, 수정, 삭제, 상세 조회 기능
+#### 인증
 
-2. 다중 태그 지정 기능
+1. 이메일 및 비밀번호 기반 로그인/로그아웃
 
-3. 필터/정렬/검색/페이지네이션 기능
+2. 판매자와 구매자에 따라 접근 가능한 기능 구분
+
+3. JWT 토큰 재발급
+
+#### 유저
  
-4. 파일 첨부 기능(확장자·용량 검증 포함)
+1. 판매자/구매자 유형 선택 회원가입
 
-<br><br>
+2. 개인정보 수정, 조회, 탈퇴
+
+3. 관심 스토어 조회
+
+#### 등급
+
+1. 유저 등급 시딩 데이터 구현
+
+#### CI-CD
+
+1. dev 브랜치에 PR 할 경우 test 및 lint 를 실행하는 ci 코드 구현
+
+2. main 브랜치에 push 할 경우 배포 서버에 자동 배포를 실행하는 cd 코드 구현
+ 
+
+#### 배포
+
+1. aws 서버에 nginx, pm2 를 사용해 백엔드 서버를 배포
+
+2. goddady 에서 도메인을 구매하여 백엔드 서버에 연결
+
+3. vercel 을 사용하여 프론트 서버를 배포
+
+#### 이미지 업로드
+
+1. aws s3 와 multer, multer-s3 를 이용하여 이미지 업로드 미들웨어를 구현
+
+#### 유닛 테스트
+
+1. 유저 유닛 테스트 코드를 구현
+
+2. 인증 테스트 코드를 구현 
+
+#### 통합 테스트
+
+1. 개발이 완료되어있는 프로젝트 API 에 대한 통합 테스트를 구현
+
+#### 팀 문서
+
+1. README.md, Team wiki, 발표 ppt 작성
+
+2. 팀원 각각 작성한 erd를 하나로 통합
+
+<br>
 
 ## 트러블 슈팅
 
@@ -418,6 +450,13 @@ taskFiles: attachments !== undefined
 
    DB 연산이 동시에 이뤄지는 기능에서는 트랜잭션을 적용하면 안정성을 높일 수 있을 것 같다는 생각이 들었습니다.
 
+<br>
 
+## 협업 및 관리 문서
 
+**팀 위키**: [https://github.com/nb02-codi-it-team1/Codi-It-backend/wiki](https://github.com/nb02-codi-it-team1/Codi-It-backend/wiki)
+
+**팀 이슈**: [https://github.com/nb02-codi-it-team1/Codi-It-backend/issues](https://github.com/nb02-codi-it-team1/Codi-It-backend/issues?q=is%3Aissue%20state%3Aclosed)
+
+**팀 PR**: [https://github.com/nb02-codi-it-team1/Codi-It-backend/pull-request](https://github.com/nb02-codi-it-team1/Codi-It-backend/pulls?q=is%3Apr+is%3Aclosed)
 
